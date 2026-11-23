@@ -1,0 +1,13 @@
+{
+  "itemGroup.economy": "Example Mod Tab",
+  "block.economy.example_block": "Example Block",
+  "item.economy.example_item": "Example Item",
+
+  "economy.configuration.title": "economy Configs",
+  "economy.configuration.section.economy.common.toml": "economy Configs",
+  "economy.configuration.section.economy.common.toml.title": "economy Configs",
+  "economy.configuration.items": "Item List",
+  "economy.configuration.logDirtBlock": "Log Dirt Block",
+  "economy.configuration.magicNumberIntroduction": "Magic Number Text",
+  "economy.configuration.magicNumber": "Magic Number"
+}
