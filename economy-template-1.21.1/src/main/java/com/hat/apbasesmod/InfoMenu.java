@@ -1,12 +1,7 @@
 package com.hat.apbasesmod;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.SimpleMenuProvider;
@@ -15,20 +10,16 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.MenuType;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.ItemLore;
 
 /**
- * Menú de información con aspecto de cofre (3 filas).
- * Es un ChestMenu normal de Minecraft: el servidor decide qué ítems "decorativos"
- * se muestran y qué pasa al hacer clic. No se puede sacar nada de adentro.
+ * Menú principal de información (cofre de 3 filas).
+ * Desde acá se llega al menú de facciones.
  */
 public class InfoMenu extends ChestMenu {
     private static final int ROWS = 3;
 
-    // Posición de cada botón (0 a 26: fila 1 = 0-8, fila 2 = 9-17, fila 3 = 18-26)
     private static final int SLOT_BANK = 11;
     private static final int SLOT_EVENTS = 13;
     private static final int SLOT_FACTIONS = 15;
@@ -37,7 +28,6 @@ public class InfoMenu extends ChestMenu {
         super(MenuType.GENERIC_9x3, containerId, playerInventory, container, ROWS);
     }
 
-    /** Abre el menú a un jugador. */
     public static void open(ServerPlayer player) {
         SimpleContainer contents = buildContents(player);
         player.openMenu(new SimpleMenuProvider(
@@ -47,51 +37,47 @@ public class InfoMenu extends ChestMenu {
 
     private static SimpleContainer buildContents(ServerPlayer player) {
         SimpleContainer container = new SimpleContainer(ROWS * 9);
-
-        // Fondo: paneles de vidrio gris sin nombre
-        ItemStack filler = icon(Items.GRAY_STAINED_GLASS_PANE, " ", ChatFormatting.GRAY);
-        for (int i = 0; i < container.getContainerSize(); i++) {
-            container.setItem(i, filler.copy());
-        }
+        MenuItems.fill(container);
 
         long balance = EconomyData.get(player.getServer()).getBalance(player.getUUID());
-
-        container.setItem(SLOT_BANK, icon(ModItems.GOLD_COIN.get(), "Banco", ChatFormatting.GOLD,
+        container.setItem(SLOT_BANK, MenuItems.icon(ModItems.GOLD_COIN.get(), "Banco", ChatFormatting.GOLD,
                 "Saldo: " + balance,
                 "",
                 "Clic: ver tu saldo en el chat",
                 "Comandos: /bank deposit, /bank withdraw"));
 
-        container.setItem(SLOT_EVENTS, icon(Items.CLOCK, "Eventos", ChatFormatting.AQUA,
+        container.setItem(SLOT_EVENTS, MenuItems.icon(Items.CLOCK, "Eventos", ChatFormatting.AQUA,
                 "Todavía no hay un sistema de eventos.",
                 "",
                 "Próximamente"));
 
-        container.setItem(SLOT_FACTIONS, icon(Items.WHITE_BANNER, "Facciones", ChatFormatting.GREEN,
-                "Todavía no hay un sistema de facciones.",
+        Faction faction = FactionsData.get(player.getServer()).getFactionOf(player.getUUID());
+        String factionLine = faction != null
+                ? "Tu facción: " + faction.getName()
+                : "No pertenecés a ninguna facción.";
+        container.setItem(SLOT_FACTIONS, MenuItems.icon(Items.WHITE_BANNER, "Facciones", ChatFormatting.GREEN,
+                factionLine,
                 "",
-                "Próximamente"));
+                "Clic: abrir el menú de facciones"));
 
         return container;
     }
 
-    // --- Qué pasa al hacer clic ---
-
     @Override
     public void clicked(int slotId, int button, ClickType clickType, Player player) {
-        // Solo reaccionamos a clic simple (izquierdo o derecho) sobre los slots del menú.
         if (clickType == ClickType.PICKUP && slotId >= 0 && slotId < ROWS * 9
                 && player instanceof ServerPlayer serverPlayer) {
             onButton(slotId, serverPlayer);
         }
-        // Todo lo demás (shift-clic, arrastrar, tirar, números) se ignora.
-        // Esto le dice al cliente que vuelva a mostrar el estado real y evita que "mueva" ítems.
-        sendAllDataToRemote();
+        // Si el botón abrió otro menú, este ya no es el activo: no hay nada que resincronizar.
+        if (player.containerMenu == this) {
+            sendAllDataToRemote();
+        }
     }
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
-        return ItemStack.EMPTY; // desactiva shift-clic
+        return ItemStack.EMPTY;
     }
 
     private void onButton(int slot, ServerPlayer player) {
@@ -102,27 +88,7 @@ public class InfoMenu extends ChestMenu {
                 player.closeContainer();
             }
             case SLOT_EVENTS -> player.sendSystemMessage(Component.literal("Todavía no hay eventos activos."));
-            case SLOT_FACTIONS -> player.sendSystemMessage(Component.literal("Las facciones llegarán pronto."));
+            case SLOT_FACTIONS -> FactionMenu.open(player); // conexión con el menú de facciones
         }
-    }
-
-    // --- Helpers para crear ítems con nombre y descripción ---
-
-    private static ItemStack icon(Item item, String name, ChatFormatting color, String... loreLines) {
-        ItemStack stack = new ItemStack(item);
-        stack.set(DataComponents.CUSTOM_NAME, plain(name, color));
-        if (loreLines.length > 0) {
-            List<Component> lines = new ArrayList<>();
-            for (String line : loreLines) {
-                lines.add(plain(line, ChatFormatting.GRAY));
-            }
-            stack.set(DataComponents.LORE, new ItemLore(lines));
-        }
-        return stack;
-    }
-
-    // Minecraft pone en cursiva los nombres personalizados; se desactiva a mano.
-    private static Component plain(String text, ChatFormatting color) {
-        return Component.literal(text).setStyle(Style.EMPTY.withItalic(false).withColor(color));
     }
 }
